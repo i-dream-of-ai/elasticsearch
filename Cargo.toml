@@ -1,0 +1,22 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+default-members = ["crates/elastic-mcp"]
+
+[workspace.dependencies]
+#rmcp = { git = "https://github.com/swallez/mcp-rust-sdk", branch = "fix-nested-sse-router"}
+#rmcp-macros = { git = "https://github.com/swallez/mcp-rust-sdk", branch = "fix-nested-sse-router" }
+
+# Main branch, 2025-06-08
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", rev = "db03f63e76b5b32f65d34a1bd08ae56dab595f60" }
+rmcp-macros = { git = "https://github.com/modelcontextprotocol/rust-sdk", rev = "db03f63e76b5b32f65d34a1bd08ae56dab595f60" }
+
+tokio = "1"
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+opt-level = "z"
+# Not added, as tower-http has a panic handling middleware
+#panic = "abort"

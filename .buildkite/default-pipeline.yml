@@ -2,7 +2,8 @@
 # $yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 steps:
   - label: "Check License"
-    command: "npm install && npm run license-checker && npm run license-header"
+
+    command: "cd npm-package && npm install && npm run license-checker && npm run license-header"
 
   - label: "Build"
-    command: "npm install && npm run build"
+    command: "cd npm-package && npm install && npm run build"

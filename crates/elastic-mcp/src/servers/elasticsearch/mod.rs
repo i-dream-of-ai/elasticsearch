@@ -1,0 +1,216 @@
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+mod base_tools;
+mod query_templates;
+
+use crate::servers::IncludeExclude;
+use elasticsearch::Elasticsearch;
+use elasticsearch::auth::Credentials;
+use elasticsearch::http::Url;
+use elasticsearch::http::response::Response;
+use indexmap::IndexMap;
+use rmcp::model::{CallToolResult, Content, ToolAnnotations};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ElasticsearchMcpConfig {
+    /// Cluster URL
+    pub url: String,
+
+    /// API key
+    pub api_key: Option<String>,
+
+    /// Login
+    pub login: Option<String>,
+
+    /// Password
+    pub password: Option<String>,
+
+    /// Search templates to expose as tools or resources
+    #[serde(default)]
+    pub tools: Tools,
+
+    /// Prompts
+    #[serde(default)]
+    pub prompts: Vec<String>,
+    // TODO: search as resources?
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Tools {
+    #[serde(flatten)]
+    pub incl_excl: Option<IncludeExclude>,
+    pub custom: HashMap<String, CustomTool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CustomTool {
+    Esql(EsqlTool),
+    SearchTemplate(SearchTemplateTool),
+}
+
+impl CustomTool {
+    pub fn base(&self) -> &ToolBase {
+        match self {
+            CustomTool::Esql(esql) => &esql.base,
+            CustomTool::SearchTemplate(search_template) => &search_template.base,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToolBase {
+    pub description: String,
+    pub parameters: IndexMap<String, schemars::schema::SchemaObject>,
+    pub annotations: Option<ToolAnnotations>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EsqlTool {
+    #[serde(flatten)]
+    base: ToolBase,
+    query: String,
+    #[serde(default)]
+    format: EsqlResultFormat,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EsqlResultFormat {
+    #[default]
+    // Output as JSON, either as an array of objects or as a single object.
+    Json,
+    // If a single object with a single property, output only its value
+    Value,
+    //Csv,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchTemplateTool {
+    #[serde(flatten)]
+    base: ToolBase,
+    #[serde(flatten)]
+    template: SearchTemplate,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchTemplate {
+    TemplateId(String),
+    Template(serde_json::Value), // or constrain to an object?
+}
+
+#[derive(Clone)]
+pub struct ElasticsearchMcp {
+    es_client: Elasticsearch,
+    config: Arc<ElasticsearchMcpConfig>,
+}
+
+impl ElasticsearchMcp {
+    pub fn setup(
+        config: ElasticsearchMcpConfig,
+        handlers: &mut crate::servers::aggregate::AggregateServerBuilder,
+    ) -> anyhow::Result<()> {
+        let mcp = Self::new_with_config(config)?;
+
+        handlers.push(base_tools::EsBaseTools::new(mcp.es_client));
+
+        Ok(())
+    }
+
+    pub fn new_with_config(config: ElasticsearchMcpConfig) -> anyhow::Result<Self> {
+        let creds = if let Some(api_key) = config.api_key.clone() {
+            Some(Credentials::EncodedApiKey(api_key))
+        } else if let Some(login) = config.login.clone() {
+            let pwd = config.password.clone().ok_or(anyhow::Error::msg("missing password"))?;
+            Some(Credentials::Basic(login, pwd))
+        } else {
+            None
+        };
+
+        let url = Url::parse(&config.url)?;
+
+        let pool = elasticsearch::http::transport::SingleNodeConnectionPool::new(url.clone());
+        let mut transport = elasticsearch::http::transport::TransportBuilder::new(pool);
+        if let Some(creds) = creds {
+            transport = transport.auth(creds);
+        }
+        let transport = transport.build()?;
+        let es_client = Elasticsearch::new(transport);
+
+        Ok(Self {
+            es_client,
+            config: Arc::new(config),
+        })
+    }
+}
+
+//------------------------------------------------------------------------------------------------
+// Utilities
+
+/// Return an error as an error response to the client, which may be able to take
+/// action to correct it. This should be refined to handle common error types such
+/// as index not found, which could be caused by the client hallucinating an index name.
+///
+/// TODO (in rmcp): if rmcp::Error had a variant that accepts a CallToolResult, this would
+/// allow to use the '?' operator while sending a result to the client.
+pub fn error_result<R>(msg: String, result: Result<R, impl std::error::Error>) -> Result<CallToolResult, rmcp::Error> {
+    match result {
+        Ok(_) => Err(rmcp::Error::internal_error("Should not be called with success", None)),
+        Err(e) => Ok(CallToolResult::error(vec![
+            Content::text(msg),
+            Content::text(format!("error: {}", e)),
+        ])),
+    }
+}
+
+/// Map any error to an internal error of the MCP server
+pub fn internal_error(e: impl std::error::Error) -> rmcp::Error {
+    rmcp::Error::internal_error(e.to_string(), None)
+}
+
+pub fn handle_error(result: Result<Response, elasticsearch::Error>) -> Result<Response, rmcp::Error> {
+    match result {
+        Ok(resp) => resp.error_for_status_code(),
+        Err(e) => {
+            tracing::error!("Error: {:?}", &e);
+            Err(e)
+        }
+    }
+    .map_err(internal_error)
+}
+
+pub async fn read_json<T: DeserializeOwned>(
+    response: Result<Response, elasticsearch::Error>,
+) -> Result<T, rmcp::Error> {
+    let text = read_text(response).await?;
+    tracing::debug!("Received json {text}");
+    serde_json::from_str(&text).map_err(internal_error)
+
+    // let response = handle_error(result)?;
+    // response.json().await.map_err(internal_error)
+}
+
+pub async fn read_text(result: Result<Response, elasticsearch::Error>) -> Result<String, rmcp::Error> {
+    let response = handle_error(result)?;
+    response.text().await.map_err(internal_error)
+}
