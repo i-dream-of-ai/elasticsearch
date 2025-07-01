@@ -23,10 +23,15 @@ use elasticsearch::Elasticsearch;
 use elasticsearch::auth::Credentials;
 use elasticsearch::http::Url;
 use elasticsearch::http::response::Response;
+use http::header;
+use http::request::Parts;
 use indexmap::IndexMap;
-use rmcp::model::{CallToolResult, Content, ToolAnnotations};
+use rmcp::RoleServer;
+use rmcp::model::ToolAnnotations;
+use rmcp::service::RequestContext;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -52,6 +57,44 @@ pub struct ElasticsearchMcpConfig {
     #[serde(default)]
     pub prompts: Vec<String>,
     // TODO: search as resources?
+}
+
+// A wrapper around an ES client that provides a client instance configured
+/// for a given request context (i.e. auth credentials)
+#[derive(Clone)]
+pub struct EsClientProvider(Elasticsearch);
+
+impl EsClientProvider {
+    pub fn new(client: Elasticsearch) -> Self {
+        EsClientProvider(client)
+    }
+
+    /// If the incoming request is a http request and has an `Authorization` header, use it
+    /// to authenticate to the remote ES instance.
+    pub fn get(&self, context: RequestContext<RoleServer>) -> Cow<Elasticsearch> {
+        let client = &self.0;
+
+        let Some(mut auth) = context
+            .extensions
+            .get::<Parts>()
+            .and_then(|p| p.headers.get(header::AUTHORIZATION))
+            .and_then(|h| h.to_str().ok())
+        else {
+            // No auth
+            return Cow::Borrowed(client);
+        };
+
+        // MCP inspector insists on sending a bearer token and prepends "Bearer" to the value provided
+        if auth.starts_with("Bearer ApiKey ") || auth.starts_with("Bearer Basic ") {
+            auth = auth.trim_start_matches("Bearer ");
+        }
+
+        let transport = client
+            .transport()
+            .clone_with_auth(Some(Credentials::AuthorizationHeader(auth.to_string())));
+
+        Cow::Owned(Elasticsearch::new(transport))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -120,24 +163,24 @@ pub enum SearchTemplate {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ElasticsearchMcp {
     es_client: Elasticsearch,
     config: Arc<ElasticsearchMcpConfig>,
 }
 
 impl ElasticsearchMcp {
+    #[allow(dead_code)]
     pub fn setup(
         config: ElasticsearchMcpConfig,
         handlers: &mut crate::servers::aggregate::AggregateServerBuilder,
     ) -> anyhow::Result<()> {
         let mcp = Self::new_with_config(config)?;
-
-        handlers.push(base_tools::EsBaseTools::new(mcp.es_client));
-
+        handlers.push(mcp);
         Ok(())
     }
 
-    pub fn new_with_config(config: ElasticsearchMcpConfig) -> anyhow::Result<Self> {
+    pub fn new_with_config(config: ElasticsearchMcpConfig) -> anyhow::Result<base_tools::EsBaseTools> {
         let creds = if let Some(api_key) = config.api_key.clone() {
             Some(Credentials::EncodedApiKey(api_key))
         } else if let Some(login) = config.login.clone() {
@@ -157,15 +200,17 @@ impl ElasticsearchMcp {
         let transport = transport.build()?;
         let es_client = Elasticsearch::new(transport);
 
-        Ok(Self {
-            es_client,
-            config: Arc::new(config),
-        })
+        Ok(base_tools::EsBaseTools::new(es_client))
     }
 }
 
 //------------------------------------------------------------------------------------------------
 // Utilities
+
+/// Map any error to an internal error of the MCP server
+pub fn internal_error(e: impl std::error::Error) -> rmcp::Error {
+    rmcp::Error::internal_error(e.to_string(), None)
+}
 
 /// Return an error as an error response to the client, which may be able to take
 /// action to correct it. This should be refined to handle common error types such
@@ -173,21 +218,6 @@ impl ElasticsearchMcp {
 ///
 /// TODO (in rmcp): if rmcp::Error had a variant that accepts a CallToolResult, this would
 /// allow to use the '?' operator while sending a result to the client.
-pub fn error_result<R>(msg: String, result: Result<R, impl std::error::Error>) -> Result<CallToolResult, rmcp::Error> {
-    match result {
-        Ok(_) => Err(rmcp::Error::internal_error("Should not be called with success", None)),
-        Err(e) => Ok(CallToolResult::error(vec![
-            Content::text(msg),
-            Content::text(format!("error: {}", e)),
-        ])),
-    }
-}
-
-/// Map any error to an internal error of the MCP server
-pub fn internal_error(e: impl std::error::Error) -> rmcp::Error {
-    rmcp::Error::internal_error(e.to_string(), None)
-}
-
 pub fn handle_error(result: Result<Response, elasticsearch::Error>) -> Result<Response, rmcp::Error> {
     match result {
         Ok(resp) => resp.error_for_status_code(),
@@ -202,14 +232,15 @@ pub fn handle_error(result: Result<Response, elasticsearch::Error>) -> Result<Re
 pub async fn read_json<T: DeserializeOwned>(
     response: Result<Response, elasticsearch::Error>,
 ) -> Result<T, rmcp::Error> {
-    let text = read_text(response).await?;
-    tracing::debug!("Received json {text}");
-    serde_json::from_str(&text).map_err(internal_error)
+    // let text = read_text(response).await?;
+    // tracing::debug!("Received json {text}");
+    // serde_json::from_str(&text).map_err(internal_error)
 
-    // let response = handle_error(result)?;
-    // response.json().await.map_err(internal_error)
+    let response = handle_error(response)?;
+    response.json().await.map_err(internal_error)
 }
 
+#[allow(dead_code)]
 pub async fn read_text(result: Result<Response, elasticsearch::Error>) -> Result<String, rmcp::Error> {
     let response = handle_error(result)?;
     response.text().await.map_err(internal_error)

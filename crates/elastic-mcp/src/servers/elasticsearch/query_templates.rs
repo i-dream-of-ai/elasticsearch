@@ -17,6 +17,8 @@
 
 //! WORK IN PROGRESS
 
+#![allow(dead_code)]
+
 use rmcp::model::JsonObject;
 use schemars::JsonSchema;
 

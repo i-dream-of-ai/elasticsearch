@@ -73,6 +73,6 @@ impl<P: ClientHandler> Service<RoleServer> for ProxyServer<P> {
 fn map_err(e: ServiceError) -> rmcp::Error {
     match e {
         ServiceError::McpError(re) => re,
-        _ => rmcp::Error::internal_error(format!("{}", e), None),
+        _ => rmcp::Error::internal_error(format!("{e}"), None),
     }
 }

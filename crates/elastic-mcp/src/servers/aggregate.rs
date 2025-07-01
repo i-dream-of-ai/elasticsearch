@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! Aggregate MCP server.
+//! WORK IN PROGRESS: Aggregate MCP server.
 //!
 //! It accepts a number of child servers and aggregates their capabilities. This serves two purposes:
 //! * split the Elasticsearch MCP server into separate code files to ease development
@@ -29,14 +29,21 @@
 //! potential conflicts and makes it also harder to handle dynamic changes to feature lists (e.g. dynamic
 //! resource update when an index is created).
 //!
+
+#![allow(dead_code)]
+
+use crate::cli::McpServer;
+use crate::servers::proxy::ProxyServer;
 use crate::utils::rmcp_ext::{DynServer, PaginatedRequest, PaginatedResult};
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use rmcp::model::*;
 use rmcp::service::{NotificationContext, RequestContext};
-use rmcp::{RoleServer, Service};
+use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
+use rmcp::{RoleServer, Service, ServiceExt};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 type McpResult<T> = Result<T, rmcp::Error>;
 
@@ -92,6 +99,65 @@ pub struct AggregateServer {
 }
 
 impl AggregateServer {
+    pub async fn new_with_config(
+        mcp_servers: HashMap<String, McpServer>,
+        ct: CancellationToken,
+    ) -> anyhow::Result<AggregateServer> {
+        let mut handlers = AggregateServer::builder();
+        for (name, server) in mcp_servers {
+            tracing::info!("Adding server {name}");
+            match server {
+                McpServer::Stdio(stdio) => {
+                    let mut cmd = tokio::process::Command::new(stdio.command);
+                    for arg in stdio.args {
+                        cmd.arg(arg);
+                    }
+                    for (k, v) in stdio.env {
+                        cmd.env(k, v);
+                    }
+                    let transport = TokioChildProcess::new(cmd)?;
+
+                    let client = ().serve(transport).await?;
+                    handlers.push(ProxyServer::new(client, ct.clone()));
+                }
+
+                McpServer::Sse(http) => {
+                    // TODO: headers
+                    let transport = StreamableHttpClientTransport::from_uri(http.url);
+
+                    let client_info = ClientInfo {
+                        protocol_version: Default::default(),
+                        capabilities: ClientCapabilities::default(),
+                        client_info: Implementation {
+                            name: name.clone(),
+                            version: "0.0.1".to_string(),
+                        },
+                    };
+                    let client = client_info.serve(transport).await?;
+                    handlers.push(ProxyServer::new(client, ct.clone()));
+                }
+
+                McpServer::StreamableHttp(http) => {
+                    // TODO: headers
+                    let transport = StreamableHttpClientTransport::from_uri(http.url);
+
+                    let client_info = ClientInfo {
+                        protocol_version: Default::default(),
+                        capabilities: ClientCapabilities::default(),
+                        client_info: Implementation {
+                            name: name.clone(),
+                            version: "0.0.1".to_string(),
+                        },
+                    };
+                    let client = client_info.serve(transport).await?;
+                    handlers.push(ProxyServer::new(client, ct.clone()));
+                }
+            }
+        }
+
+        Ok(handlers.build())
+    }
+
     pub fn builder() -> AggregateServerBuilder {
         AggregateServerBuilder::default()
     }
@@ -226,42 +292,6 @@ impl Service<RoleServer> for AggregateServer {
         context: RequestContext<RoleServer>,
     ) -> McpResult<ServerResult> {
         use ClientRequest::*;
-
-        // Experiments to access transport-level data
-
-        // let req_meta = format!("{:?}", request.get_meta());
-        //
-        // let context_ext_parts = context.extensions.get::<http::request::Parts>();
-        //
-        // let context_meta = format!("{:?}", context.meta);
-        // let context_ext_meta = format!("{:?}", context.extensions.get::<rmcp::model::Meta>());
-
-        // let req_parts = context.extensions.get::<http::request::Parts>();
-        // let req_id = TypeId::of::<http::request::Parts>();
-        //
-        // let resp_parts = context.extensions.get::<http::response::Parts>();
-        // let resp_id = TypeId::of::<http::response::Parts>();
-        //
-        // //let meta = context.meta;
-        // let meta_ext = context.extensions.get::<rmcp::model::Meta>();
-        //
-        // let req_meta = request.get_meta();
-        // let req_meta2 = request.extensions().get::<rmcp::model::Meta>();
-
-        // Get HTTP request url, method, header, etc.
-        let context_ext_parts = context.extensions.get::<http::response::Parts>();
-
-        // Get request metadata, like "progressToken"
-        // https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress
-        let context_ext_meta = context.extensions.get::<rmcp::model::Meta>();
-
-        // Note: context.meta and request.get_meta() are empty
-        let context_meta: &rmcp::model::Meta = &context.meta;
-
-        let req_ext_meta = request.extensions().get::<rmcp::model::Meta>();
-        let req_meta: &rmcp::model::Meta = request.get_meta();
-
-        //println!("Handling request {:?}", request);
 
         match request {
             PingRequest(_) => {

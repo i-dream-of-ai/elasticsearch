@@ -15,14 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::servers::elasticsearch::read_json;
+use crate::servers::elasticsearch::{EsClientProvider, read_json};
 use elasticsearch::cat::{CatIndicesParts, CatShardsParts};
 use elasticsearch::indices::IndicesGetMappingParts;
 use elasticsearch::{Elasticsearch, SearchParts};
 use indexmap::IndexMap;
-use rmcp::ServerHandler;
+use rmcp::handler::server::tool::{Parameters, ToolRouter};
 use rmcp::model::{CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo};
-use rmcp_macros::tool;
+use rmcp::service::RequestContext;
+use rmcp::{RoleServer, ServerHandler};
+use rmcp_macros::{tool, tool_handler, tool_router};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
 use serde_json::{Map, Value, json};
@@ -30,32 +32,70 @@ use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct EsBaseTools {
-    es_client: Elasticsearch,
+    es_client: EsClientProvider,
+    tool_router: ToolRouter<EsBaseTools>,
 }
 
-#[tool(tool_box)]
 impl EsBaseTools {
     pub fn new(es_client: Elasticsearch) -> Self {
-        Self { es_client }
+        Self {
+            es_client: EsClientProvider::new(es_client),
+            tool_router: Self::tool_router(),
+        }
     }
+}
 
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct ListIndicesParams {
+    /// Index pattern of Elasticsearch indices to list
+    pub index_pattern: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct GetMappingsParams {
+    /// Name of the Elasticsearch index to get mappings for
+    index: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct SearchParams {
+    /// Name of the Elasticsearch index to search
+    index: String,
+
+    /// Name of the fields that need to be returned (optional)
+    fields: Option<Vec<String>>,
+
+    /// Complete Elasticsearch query DSL object that can include query, size, from, sort, etc.
+    query_body: Map<String, Value>, // note: just Value doesn't work, as Claude would send a string
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct EsqlQueryParams {
+    /// Complete Elasticsearch ES|QL query
+    query: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct GetShardsParams {
+    /// Optional index name to get shard information for
+    index: Option<String>,
+}
+
+#[tool_router]
+impl EsBaseTools {
     //---------------------------------------------------------------------------------------------
     /// Tool: list indices
     #[tool(
         description = "List all available Elasticsearch indices",
-        annotations = {
-            title: "List ES indices",
-            readOnlyHint: true
-        }
+        annotations(title = "List ES indices", read_only_hint = true)
     )]
     async fn list_indices(
         &self,
-        #[tool(param)]
-        #[schemars(description = "Index pattern of Elasticsearch indices to list")]
-        index_pattern: String,
+        req_ctx: RequestContext<RoleServer>,
+        Parameters(ListIndicesParams { index_pattern }): Parameters<ListIndicesParams>,
     ) -> Result<CallToolResult, rmcp::Error> {
-        let response = self
-            .es_client
+        let es_client = self.es_client.get(req_ctx);
+        let response = es_client
             .cat()
             .indices(CatIndicesParts::Index(&[&index_pattern]))
             .h(&["index", "status", "docs.count"])
@@ -75,18 +115,15 @@ impl EsBaseTools {
     /// Tool: get mappings for an index
     #[tool(
         description = "Get field mappings for a specific Elasticsearch index",
-        annotations = {
-            title: "Get ES index mappings",
-            readOnlyHint: true
-        })]
+        annotations(title = "Get ES index mappings", read_only_hint = true)
+    )]
     async fn get_mappings(
         &self,
-        #[tool(param)]
-        #[schemars(description = "Name of the Elasticsearch index to get mappings for")]
-        index: String,
+        req_ctx: RequestContext<RoleServer>,
+        Parameters(GetMappingsParams { index }): Parameters<GetMappingsParams>,
     ) -> Result<CallToolResult, rmcp::Error> {
-        let response = self
-            .es_client
+        let es_client = self.es_client.get(req_ctx);
+        let response = es_client
             .indices()
             .get_mapping(IndicesGetMappingParts::Index(&[&index]))
             .send()
@@ -110,28 +147,19 @@ impl EsBaseTools {
     /// request property to narrow down the data returned and reduce their context size
     #[tool(
         description = "Perform an Elasticsearch search with the provided query DSL.",
-        annotations = {
-            title: "Elasticsearch search DSL query",
-            readOnlyHint: true
-        }
+        annotations(title = "Elasticsearch search DSL query", read_only_hint = true)
     )]
     async fn search(
         &self,
-
-        #[tool(param)]
-        #[schemars(description = "Name of the Elasticsearch index to search")]
-        index: String,
-
-        #[tool(param)]
-        #[schemars(description = "Name of the fields that need to be returned (optional)")]
-        fields: Option<Vec<String>>,
-
-        #[tool(param)]
-        #[schemars(
-            description = "Complete Elasticsearch query DSL object that can include query, size, from, sort, etc."
-        )]
-        query_body: Map<String, Value>, // note: just Value doesn't work, Claude sends a string
+        req_ctx: RequestContext<RoleServer>,
+        Parameters(SearchParams {
+            index,
+            fields,
+            query_body,
+        }): Parameters<SearchParams>,
     ) -> Result<CallToolResult, rmcp::Error> {
+        let es_client = self.es_client.get(req_ctx);
+
         let mut query_body = query_body;
 
         if let Some(fields) = fields {
@@ -145,8 +173,7 @@ impl EsBaseTools {
             }
         }
 
-        let response = self
-            .es_client
+        let response = es_client
             .search(SearchParts::Index(&[&index]))
             .body(query_body)
             .send()
@@ -192,19 +219,18 @@ impl EsBaseTools {
     /// Tool: ES|QL
     #[tool(
         description = "Perform an Elasticsearch ES|QL query.",
-        annotations = {
-            title: "Elasticsearch ES|QL query",
-            readOnlyHint: true
-        })]
+        annotations(title = "Elasticsearch ES|QL query", read_only_hint = true)
+    )]
     async fn esql(
         &self,
-        #[tool(param)]
-        #[schemars(description = "Complete Elasticsearch ES|QL query.")]
-        query: String,
+        req_ctx: RequestContext<RoleServer>,
+        Parameters(EsqlQueryParams { query }): Parameters<EsqlQueryParams>,
     ) -> Result<CallToolResult, rmcp::Error> {
+        let es_client = self.es_client.get(req_ctx);
+
         let request = EsqlQueryRequest { query };
 
-        let response = self.es_client.esql().query().body(request).send().await;
+        let response = es_client.esql().query().body(request).send().await;
         let response: EsqlQueryResponse = read_json(response).await?;
 
         // Transform response into an array of objects
@@ -227,18 +253,15 @@ impl EsBaseTools {
     // Tool: get shard information
     #[tool(
         description = "Get shard information for all or specific indices.",
-        annotations = {
-            title: "Get ES shard information",
-            readOnlyHint: true
-        }
+        annotations(title = "Get ES shard information", read_only_hint = true)
     )]
     async fn get_shards(
         &self,
-
-        #[tool(param)]
-        #[schemars(description = "Optional index name to get shard information for")]
-        index: Option<String>,
+        req_ctx: RequestContext<RoleServer>,
+        Parameters(GetShardsParams { index }): Parameters<GetShardsParams>,
     ) -> Result<CallToolResult, rmcp::Error> {
+        let es_client = self.es_client.get(req_ctx);
+
         let indices: [&str; 1];
         let parts = match &index {
             Some(index) => {
@@ -247,8 +270,7 @@ impl EsBaseTools {
             }
             None => CatShardsParts::None,
         };
-        let response = self
-            .es_client
+        let response = es_client
             .cat()
             .shards(parts)
             .format("json")
@@ -265,11 +287,11 @@ impl EsBaseTools {
     }
 }
 
-#[tool(tool_box)]
+#[tool_handler]
 impl ServerHandler for EsBaseTools {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
+            protocol_version: ProtocolVersion::V_2025_03_26,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation::from_build_env(),
             instructions: Some("Provides access to Elasticsearch".to_string()),

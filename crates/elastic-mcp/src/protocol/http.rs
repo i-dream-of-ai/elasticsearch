@@ -72,7 +72,8 @@ impl HttpProtocol {
             let server_provider = server_provider.clone();
             // TODO: internally, new() wraps the server provider closure with an Arc. We can avoid
             // "double-Arc" by having
-            let sh_service = StreamableHttpService::new(move || server_provider(), config.session_manager, sh_config);
+            let sh_service =
+                StreamableHttpService::new(move || Ok(server_provider()), config.session_manager, sh_config);
             Router::new().route_service("/", sh_service)
         };
 
@@ -132,4 +133,12 @@ impl HttpProtocol {
 
         Ok(ct)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test_parts_in_extensions() {}
 }

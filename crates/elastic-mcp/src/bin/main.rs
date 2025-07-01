@@ -16,7 +16,7 @@
 // under the License.
 
 use clap::Parser;
-use elastic_mcp::cli::{Cli, Command, HttpCommand, McpServer, McpServers, StdioCommand};
+use elastic_mcp::cli::{Cli, Command};
 use tracing_subscriber::EnvFilter;
 
 // To test with stdio, use npx @modelcontextprotocol/inspector cargo run -p elastic-mcp

@@ -33,6 +33,7 @@ pub type DynServer = Box<dyn DynService<RoleServer>>;
 /// A factory to create server (`Service<RoleServer>`) instances.
 pub struct ServerProvider<S: Service<RoleServer>>(pub Arc<dyn Fn() -> S + Send + Sync>);
 
+#[allow(dead_code)]
 impl<S: Service<RoleServer>> ServerProvider<S> {
     pub fn call(&self) -> S {
         self.0()

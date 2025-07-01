@@ -458,8 +458,7 @@ dependencies = [
 [[package]]
 name = "elasticsearch"
 version = "9.0.0-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac56c5020df7eb14e32b0ffd300b510a99684ccd539a9fb8847abf2739cbac7b"
+source = "git+https://github.com/elastic/elasticsearch-rs?branch=new-with-creds#8eb4e7fc98046882de46536b3a25291511e2ca75"
 dependencies = [
  "base64",
  "bytes",
@@ -1668,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "rmcp"
 version = "0.1.5"
-source = "git+https://github.com/modelcontextprotocol/rust-sdk?rev=db03f63e76b5b32f65d34a1bd08ae56dab595f60#db03f63e76b5b32f65d34a1bd08ae56dab595f60"
+source = "git+https://github.com/modelcontextprotocol/rust-sdk?rev=b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c#b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c"
 dependencies = [
  "axum",
  "base64",
@@ -1702,8 +1701,9 @@ dependencies = [
 [[package]]
 name = "rmcp-macros"
 version = "0.1.5"
-source = "git+https://github.com/modelcontextprotocol/rust-sdk?rev=db03f63e76b5b32f65d34a1bd08ae56dab595f60#db03f63e76b5b32f65d34a1bd08ae56dab595f60"
+source = "git+https://github.com/modelcontextprotocol/rust-sdk?rev=b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c#b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c"
 dependencies = [
+ "darling",
  "proc-macro2",
  "quote",
  "serde_json",

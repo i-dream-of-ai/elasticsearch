@@ -1,12 +1,10 @@
 
 {
-  "mcpServers": {
-
-    // Mount an Elasticsearch cluster on the MCP server
+    // Configure the target Elasticsearch server
     "elasticsearch": {
       "type": "elasticsearch",
       "url": "${ELASTICSEARCH_URL:http://localhost:9200}",
-      "api_key": "${ELASTICSEARCH_API_KEY}",
+      "api_key": "${ELASTICSEARCH_API_KEY:}",
 
       /* WIP
       "tools": {
@@ -63,5 +61,4 @@
       }
       */
     }
-  }
 }

@@ -104,7 +104,6 @@ pub struct Http {
 #[serde(tag = "type")]
 pub enum McpServer {
     //Builtin(BuiltinConfig),
-    Elasticsearch(elasticsearch::ElasticsearchMcpConfig),
     Sse(Http),
     StreamableHttp(Http),
     Stdio(Stdio),
@@ -112,6 +111,8 @@ pub enum McpServer {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServers {
+pub struct Configuration {
+    pub elasticsearch: elasticsearch::ElasticsearchMcpConfig,
+    #[serde(default)]
     pub mcp_servers: HashMap<String, McpServer>,
 }
