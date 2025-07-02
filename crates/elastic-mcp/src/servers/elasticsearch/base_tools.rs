@@ -21,7 +21,7 @@ use elasticsearch::indices::IndicesGetMappingParts;
 use elasticsearch::{Elasticsearch, SearchParts};
 use indexmap::IndexMap;
 use rmcp::handler::server::tool::{Parameters, ToolRouter};
-use rmcp::model::{CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo};
+use rmcp::model::{CallToolResult, Content, Implementation, JsonObject, ProtocolVersion, ServerCapabilities, ServerInfo};
 use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
 use rmcp_macros::{tool, tool_handler, tool_router};
@@ -362,6 +362,8 @@ pub struct Mappings {
 
 #[derive(Serialize, Deserialize)]
 pub struct Mapping {
+    #[serde(rename = "_meta", skip_serializing_if="Option::is_none")]
+    pub meta: Option<JsonObject>,
     properties: HashMap<String, MappingProperty>,
 }
 
