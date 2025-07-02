@@ -108,8 +108,9 @@ impl HttpProtocol {
 
         // Put all things together
         let main_router = Router::new()
-            .nest("/sse", sse_router)
-            .nest("/stream", sh_router)
+            .route("/ping", get(async || (StatusCode::OK, "Ready\n")))
+            .nest("/mcp/sse", sse_router)
+            .nest("/mcp", sh_router)
             .nest("/_health", health_router)
             .with_state(());
 
