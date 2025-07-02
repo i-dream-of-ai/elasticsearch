@@ -67,7 +67,7 @@ pub fn interpolate(s: String, lookup: impl Fn(&str) -> Option<String>) -> Result
                 let value = if let Some((name, default)) = expr.split_once(':') {
                     lookup(name).unwrap_or(default.to_string())
                 } else {
-                    lookup(expr).ok_or_else(|| err(char_no, format!("unknown variable '{expr}'")))?
+                    lookup(expr).ok_or_else(|| err(char_no, format!("env variable '{expr}' not defined")))?
                 };
                 result.push_str(&value);
 

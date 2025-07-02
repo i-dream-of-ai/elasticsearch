@@ -1,22 +1,69 @@
-[workspace]
-resolver = "3"
-members = ["crates/*"]
-default-members = ["crates/elastic-mcp"]
+[package]
+name = "elasticsearch-core-mcp-server"
+version = "0.4.0"
+edition = "2024"
+authors = ["Elastic.co"]
+license-file = "LICENSE"
+description = "MCP server for core Elastisearch features"
+homepage = "https://github.com/elastic/mcp-server-elasticsearch"
+repository = "https://github.com/elastic/mcp-server-elasticsearch"
 
-[workspace.dependencies]
+[dependencies]
+# Base stuff
+anyhow = "1.0"
+futures = "0.3"
+indexmap = { version = "2", features = ["serde"] }
+itertools = "0.12"
+thiserror = "2"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+
+# CLI, config
+clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
+serde-aux = "4"
+serde_json5 = "0.2"
+is-container = "0.1.2"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "std",
+    "fmt",
+]}
 
 elasticsearch = { version = "9.0.0-alpha.1", git = "https://github.com/elastic/elasticsearch-rs", branch = "new-with-creds" }
 
-# Main branch, 2025-06-26
-rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", rev = "b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c" }
-rmcp-macros = { git = "https://github.com/modelcontextprotocol/rust-sdk", rev = "b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c" }
+# Async and http
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "io-std", "signal", "process"] }
+tokio-util = "0.7"
+axum = "0.8"
+http = "1.3.1"
 
-tokio = "1"
+# Schemars: keep in sync with rmcp
+schemars = { version = "0.8", features = ["chrono"] }
+
+# MCP rust sdk: main branch, 2025-06-26
+[dependencies.rmcp]
+git = "https://github.com/modelcontextprotocol/rust-sdk"
+features = [
+    "server", "auth",
+    "transport-sse-server", "transport-streamable-http-server",
+    "transport-io", # stdio
+    "client", "transport-sse-client", "transport-streamable-http-client", "transport-child-process",
+]
+# Keep rev in sync with rmcp-macros below
+rev = "b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c"
+
+[dependencies.rmcp-macros]
+git = "https://github.com/modelcontextprotocol/rust-sdk"
+rev = "b9d7d61ebd6e8385cbc4aa105d4e25774fc1a59c"
 
 [profile.release]
 codegen-units = 1
 strip = true
 lto = true
 opt-level = "z"
-# Not added, as tower-http has a panic handling middleware
-#panic = "abort"
+# Note: do not add `panic = "abort"` since tower-http has a panic-handling middleware

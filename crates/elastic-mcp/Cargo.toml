@@ -2,7 +2,7 @@
 name = "elastic-mcp"
 version = "0.1.0"
 edition = "2024"
-default-run = "main"
+default-run = "elasticsearch-core-mcp-server"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -10,6 +10,7 @@ dotenvy = "0.15"
 thiserror = "2"
 elasticsearch = { workspace = true }
 serde-aux = "4"
+is-container = "0.1.2"
 
 rmcp = { workspace = true, features = ["server", "client", "transport-sse-client", "transport-streamable-http-client", "transport-sse-server", "transport-io", "transport-streamable-http-server", "auth", "transport-child-process"] }
 

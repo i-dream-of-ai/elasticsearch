@@ -9,18 +9,17 @@ FROM rust:1.88 AS builder
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
-COPY crates/elastic-mcp/Cargo.toml ./crates/elastic-mcp/
 
 # Cache dependencies
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
-    mkdir -p ./crates/elastic-mcp/src/bin && \
-    echo "pub fn main() {}" > ./crates/elastic-mcp/src/bin/elasticsearch-core-mcp-server.rs && \
-    cargo build --release --bin elasticsearch-core-mcp-server
+    mkdir -p ./src && \
+    echo "pub fn main() {}" > ./src/main.rs && \
+    cargo build --release
 
-COPY crates ./crates/
+COPY src ./src/
 
-RUN cargo build --release --bin elasticsearch-core-mcp-server
+RUN cargo build --release
 
 #--------------------------------------------------------------------------------------------------
 

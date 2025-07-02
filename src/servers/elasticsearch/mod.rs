@@ -18,10 +18,11 @@
 mod base_tools;
 mod query_templates;
 
-use crate::utils::none_if_empty_string;
 use crate::servers::IncludeExclude;
+use crate::utils::none_if_empty_string;
 use elasticsearch::Elasticsearch;
 use elasticsearch::auth::Credentials;
+use elasticsearch::cert::CertificateValidation;
 use elasticsearch::http::Url;
 use elasticsearch::http::response::Response;
 use http::header;
@@ -32,11 +33,10 @@ use rmcp::model::ToolAnnotations;
 use rmcp::service::RequestContext;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_aux::field_attributes::deserialize_bool_from_anything;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
-use elasticsearch::cert::CertificateValidation;
-use serde_aux::field_attributes::deserialize_bool_from_anything;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ElasticsearchMcpConfig {

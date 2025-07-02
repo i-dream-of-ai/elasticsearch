@@ -16,9 +16,9 @@
 // under the License.
 
 use clap::Parser;
-use elastic_mcp::cli::{Cli, Command};
 use tracing_subscriber::EnvFilter;
-
+use elasticsearch_core_mcp_server::cli::{Cli, Command};
+use elasticsearch_core_mcp_server::{run_http, run_stdio};
 // To test with stdio, use npx @modelcontextprotocol/inspector cargo run -p elastic-mcp
 
 #[tokio::main]
@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize the tracing subscriber with file and stdout logging
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::DEBUG.into()))
+        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .with_writer(std::io::stderr)
         .with_ansi(false)
         .init();
@@ -35,8 +35,8 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting MCP server");
 
     match cli.command {
-        Command::Stdio(cmd) => elastic_mcp::run_stdio(cmd).await?,
-        Command::Http(cmd) => elastic_mcp::run_http(cmd).await?,
+        Command::Stdio(cmd) => run_stdio(cmd).await?,
+        Command::Http(cmd) => run_http(cmd).await?,
     };
 
     Ok(())

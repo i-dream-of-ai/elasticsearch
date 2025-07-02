@@ -15,4 +15,4 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! Empty for now, stdio is handled in `main.rs`.
+//! Empty for now, stdio is handled in `lib.rs`.

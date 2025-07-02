@@ -20,16 +20,12 @@ use serde::{Deserialize, Deserializer};
 pub mod interpolator;
 pub mod rmcp_ext;
 
-
 /// Deserialize a string, and return `None` if it's empty. Useful for configuration fields like
 /// `"foo": "${SOME_ENV_VAR:}"` that uses an env var if present without failing if missing.
-pub fn none_if_empty_string<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<String>, D::Error> {
-
+pub fn none_if_empty_string<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
     let s: Option<String> = Deserialize::deserialize(deserializer)?;
     match s {
         Some(s) if s.is_empty() => Ok(None),
-        _ => Ok(s)
+        _ => Ok(s),
     }
 }

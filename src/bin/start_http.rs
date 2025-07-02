@@ -15,7 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use elastic_mcp::cli::HttpCommand;
+use elasticsearch_core_mcp_server::cli::HttpCommand;
+use elasticsearch_core_mcp_server::run_http;
 
 /// Start the MCP http server with the local configuration.
 /// Useful for debugging from the IDE.
@@ -23,9 +24,9 @@ use elastic_mcp::cli::HttpCommand;
 pub async fn main() -> anyhow::Result<()> {
     println!("Current directory: {:?}", std::env::current_dir()?);
 
-    elastic_mcp::run_http(HttpCommand {
+    run_http(HttpCommand {
         config: Some("elastic-mcp.json5".parse()?),
-        address: "127.0.0.1:8080".parse()?,
+        address: None,
         sse: true,
     })
     .await?;
