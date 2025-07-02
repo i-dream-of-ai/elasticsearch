@@ -8,6 +8,8 @@ description = "MCP server for core Elastisearch features"
 homepage = "https://github.com/elastic/mcp-server-elasticsearch"
 repository = "https://github.com/elastic/mcp-server-elasticsearch"
 
+default-run = "elasticsearch-core-mcp-server"
+
 [dependencies]
 # Base stuff
 anyhow = "1.0"

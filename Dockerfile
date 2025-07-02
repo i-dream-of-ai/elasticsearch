@@ -13,8 +13,8 @@ COPY Cargo.toml Cargo.lock ./
 # Cache dependencies
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
-    mkdir -p ./src && \
-    echo "pub fn main() {}" > ./src/main.rs && \
+    mkdir -p ./src/bin && \
+    echo "pub fn main() {}" > ./src/bin/elasticsearch-core-mcp-server.rs && \
     cargo build --release
 
 COPY src ./src/
