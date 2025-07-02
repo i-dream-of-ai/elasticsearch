@@ -21,9 +21,7 @@ use elasticsearch::indices::IndicesGetMappingParts;
 use elasticsearch::{Elasticsearch, SearchParts};
 use indexmap::IndexMap;
 use rmcp::handler::server::tool::{Parameters, ToolRouter};
-use rmcp::model::{
-    CallToolResult, Content, Implementation, JsonObject, ProtocolVersion, ServerCapabilities, ServerInfo,
-};
+use rmcp::model::{Annotated, CallToolResult, Content, Implementation, JsonObject, ListResourcesResult, PaginatedRequestParam, ProtocolVersion, RawResource, ReadResourceRequestParam, ReadResourceResult, ResourceContents, ServerCapabilities, ServerInfo};
 use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
 use rmcp_macros::{tool, tool_handler, tool_router};
@@ -294,9 +292,43 @@ impl ServerHandler for EsBaseTools {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2025_03_26,
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
+            capabilities: ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .build(),
             server_info: Implementation::from_build_env(),
             instructions: Some("Provides access to Elasticsearch".to_string()),
+        }
+    }
+
+    async fn list_resources(&self, _request: Option<PaginatedRequestParam>, _context: RequestContext<RoleServer>) -> Result<ListResourcesResult, rmcp::Error> {
+        Ok(ListResourcesResult {
+            resources: vec![
+                Annotated {
+                    raw: RawResource {
+                        name: "esql-reference".to_string(),
+                        description: Some("Reference documentation and grammar for the ES|QL query language that can be used with the `esql` tool.".to_string()),
+                        uri: "text:://esql-reference.md".to_string(),
+                        mime_type: Some("text/plain".to_string()),
+                        size: None
+                    },
+                    annotations: None
+                }
+            ],
+            next_cursor: None,
+        })
+    }
+
+    async fn read_resource(&self, request: ReadResourceRequestParam, _context: RequestContext<RoleServer>) -> Result<ReadResourceResult, rmcp::Error> {
+        match request.uri.as_str() {
+            "text:://esql-reference.md" => Ok(ReadResourceResult {
+                contents: vec![ResourceContents::TextResourceContents {
+                    uri: request.uri.clone(),
+                    mime_type: Some("text/plain".to_string()),
+                    text: include_str!("_data/esql_reference.md").to_string()
+                }]
+            }),
+            _ => Err(rmcp::Error::resource_not_found(request.uri, None))
         }
     }
 }
