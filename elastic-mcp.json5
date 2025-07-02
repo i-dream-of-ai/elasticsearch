@@ -2,9 +2,11 @@
 {
     // Configure the target Elasticsearch server
     "elasticsearch": {
-      "type": "elasticsearch",
-      "url": "${ELASTICSEARCH_URL:http://localhost:9200}",
-      "api_key": "${ELASTICSEARCH_API_KEY:}",
+      "url": "${ES_URL}",
+      "api_key": "${ES_API_KEY:}",
+      "username": "${ES_LOGIN:}",
+      "password": "${ES_PASSWORD:}",
+      "ssl_skip_verify": "${ES_SSL_SKIP_VERIFY:false}",
 
       /* WIP
       "tools": {

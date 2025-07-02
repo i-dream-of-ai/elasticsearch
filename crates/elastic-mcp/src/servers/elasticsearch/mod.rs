@@ -18,6 +18,7 @@
 mod base_tools;
 mod query_templates;
 
+use crate::utils::none_if_empty_string;
 use crate::servers::IncludeExclude;
 use elasticsearch::Elasticsearch;
 use elasticsearch::auth::Credentials;
@@ -34,6 +35,8 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use elasticsearch::cert::CertificateValidation;
+use serde_aux::field_attributes::deserialize_bool_from_anything;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ElasticsearchMcpConfig {
@@ -41,13 +44,20 @@ pub struct ElasticsearchMcpConfig {
     pub url: String,
 
     /// API key
+    #[serde(default, deserialize_with = "none_if_empty_string")]
     pub api_key: Option<String>,
 
     /// Login
+    #[serde(default, deserialize_with = "none_if_empty_string")]
     pub login: Option<String>,
 
     /// Password
+    #[serde(default, deserialize_with = "none_if_empty_string")]
     pub password: Option<String>,
+
+    /// Should we skip SSL certificate verification?
+    #[serde(default, deserialize_with = "deserialize_bool_from_anything")]
+    pub ssl_skip_verify: bool,
 
     /// Search templates to expose as tools or resources
     #[serde(default)]
@@ -196,6 +206,9 @@ impl ElasticsearchMcp {
         let mut transport = elasticsearch::http::transport::TransportBuilder::new(pool);
         if let Some(creds) = creds {
             transport = transport.auth(creds);
+        }
+        if config.ssl_skip_verify {
+            transport = transport.cert_validation(CertificateValidation::None)
         }
         let transport = transport.build()?;
         let es_client = Elasticsearch::new(transport);

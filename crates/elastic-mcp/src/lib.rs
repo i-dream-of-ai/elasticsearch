@@ -28,13 +28,13 @@ use rmcp::transport::stdio;
 use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
 use rmcp::{RoleServer, Service, ServiceExt};
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 pub async fn run_stdio(cmd: StdioCommand) -> anyhow::Result<()> {
-    let (ct, handler) = crate::setup_services(&cmd.config).await?;
+    let (ct, handler) = setup_services(&cmd.config).await?;
     let service = handler.serve(stdio()).await.inspect_err(|e| {
         tracing::error!("serving error: {:?}", e);
     })?;
@@ -69,7 +69,7 @@ pub async fn run_http(cmd: HttpCommand) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn setup_services(config: &Path) -> anyhow::Result<(CancellationToken, impl Service<RoleServer> + Clone)> {
+async fn setup_services(config: &Option<PathBuf>) -> anyhow::Result<(CancellationToken, impl Service<RoleServer> + Clone)> {
     // Read config file and expand variables, also accepting .env files
     match dotenvy::dotenv() {
         Err(dotenvy::Error::Io(io_err)) if io_err.kind() == ErrorKind::NotFound => {}
@@ -77,7 +77,20 @@ async fn setup_services(config: &Path) -> anyhow::Result<(CancellationToken, imp
         Ok(_) => {}
     }
 
-    let config = std::fs::read_to_string(config)?;
+    let config = if let Some(path) = config {
+        std::fs::read_to_string(path)?
+    } else {
+        // Built-in default configuration, based on env variables.
+        r#"{
+            "elasticsearch": {
+                "url": "${ES_URL}",
+                "api_key": "${ES_API_KEY:}",
+                "username": "${ES_LOGIN:}",
+                "password": "${ES_PASSWORD:}",
+                "ssl_skip_verify": "${ES_SSL_SKIP_VERIFY:false}"
+            }
+        }"#.to_string()
+    };
 
     // Expand environment variables in the config file
     let config = interpolator::interpolate_from_env(config)?;

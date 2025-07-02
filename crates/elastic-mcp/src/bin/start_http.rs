@@ -24,7 +24,7 @@ pub async fn main() -> anyhow::Result<()> {
     println!("Current directory: {:?}", std::env::current_dir()?);
 
     elastic_mcp::run_http(HttpCommand {
-        config: "elastic-mcp.json5".parse()?,
+        config: Some("elastic-mcp.json5".parse()?),
         address: "127.0.0.1:8080".parse()?,
         sse: true,
     })

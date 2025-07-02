@@ -21,7 +21,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 #[error("Invalid configuration template: {reason} at {line}:{char}")]
 pub struct InterpolationError {
-    pub reason: &'static str,
+    pub reason: String,
     pub line: usize,
     pub char: usize,
 }
@@ -49,7 +49,7 @@ pub fn interpolate(s: String, lookup: impl Fn(&str) -> Option<String>) -> Result
         }
         let mut char_no = 0;
 
-        let err = |char_no: usize, msg: &'static str| InterpolationError {
+        let err = |char_no: usize, msg: String| InterpolationError {
             reason: msg,
             line: line_no + 1, // editors (and humans) are 1-based
             char: char_no,
@@ -67,14 +67,14 @@ pub fn interpolate(s: String, lookup: impl Fn(&str) -> Option<String>) -> Result
                 let value = if let Some((name, default)) = expr.split_once(':') {
                     lookup(name).unwrap_or(default.to_string())
                 } else {
-                    lookup(expr).ok_or_else(|| err(char_no, "unknown variable"))?
+                    lookup(expr).ok_or_else(|| err(char_no, format!("unknown variable '{expr}'")))?
                 };
                 result.push_str(&value);
 
                 char_no += expr.len() + CLOSE_LEN;
                 line = &line[expr.len() + CLOSE_LEN..];
             } else {
-                return Err(err(char_no, "missing closing braces"));
+                return Err(err(char_no, "missing closing braces".to_string()));
             }
         }
         result.push_str(line);

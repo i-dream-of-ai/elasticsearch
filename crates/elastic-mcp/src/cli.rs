@@ -39,8 +39,8 @@ pub enum Command {
 #[derive(Debug, Args)]
 pub struct HttpCommand {
     /// Config file
-    #[clap(short, long, default_value = "elastic-mcp.json5")]
-    pub config: PathBuf,
+    #[clap(short, long)]
+    pub config: Option<PathBuf>,
 
     /// Address to listen to
     #[clap(long, value_name = "IP_ADDRESS:PORT", default_value = "127.0.0.1:8080")]
@@ -55,8 +55,8 @@ pub struct HttpCommand {
 #[derive(Debug, Args)]
 pub struct StdioCommand {
     /// Config file
-    #[clap(short, long, default_value = "elastic-mcp.json5")]
-    pub config: PathBuf,
+    #[clap(short, long)]
+    pub config: Option<PathBuf>,
 }
 
 //---------------------------------------------------------------
