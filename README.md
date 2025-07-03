@@ -2,9 +2,9 @@
 
 > [!CAUTION]
 > 
-> **WORK IN PROGRESS**. This is a development branch, not ready for use, things may be broken. You've been warned!
+> **WARNING: this is MCP server is EXPERIMENTAL.**
 
-Connect to your Elasticsearch data directly from any MCP Client (like Claude Desktop) using the Model Context Protocol (MCP).
+Connect to your Elasticsearch data directly from any MCP Client using the Model Context Protocol (MCP).
 
 This server connects agents to your Elasticsearch data using the Model Context Protocol. It allows you to interact with your Elasticsearch indices through natural language conversations.
 
@@ -20,16 +20,112 @@ This server connects agents to your Elasticsearch data using the Model Context P
 
 * An Elasticsearch instance
 * Elasticsearch authentication credentials (API key or username/password)
-* MCP Client (e.g. Claude Desktop)
+* An MCP Client (e.g. [Claude Desktop](https://claude.ai/download), [Goose](https://block.github.io/goose/))
 
 ## Installation & Setup
 
-This branch is a development branch. This version is not packaged yet.
+This MCP server is provided as a Docker image at `docker.elastic.co/mcp/elasticsearch`
+that supports MCP's stdio, SSE and streamable-HTTP protocols.
 
-One-time operations:
-* make sure [Rust is installed](https://www.rust-lang.org/tools/install)
-* copy the `.env-example` file to `.env` and update its content according to your environment
+Running this container without any argument will output a usage message:
 
-And run
-* `cargo run http` for a streamable-http server on http://localhost:8080
-* `/path/to/scripts/cargo-run.sh stdio` for a stdio server (this script sets the current directory before starting `cargo run`)
+```
+docker run docker.elastic.co/mcp/elasticsearch
+```
+
+```
+Usage: elasticsearch-mcp-server <COMMAND>
+
+Commands:
+  stdio  Start a stdio server
+  http   Start a streamable-HTTP server with optional SSE support
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+```
+
+### Using the stdio protocol
+
+The MCP server needs environment variables to be set:
+* `ES_URL`, the URL of your Elasticsearch cluster
+* `ES_API_KEY`, the Elasticsearch API key. We **strongly recommend** creating an API key
+   with limited privileges so that the LLM only has access to the data and operations
+   required for the usage context.
+* Optionally, `ES_SSL_SKIP_VERIFY` set to `true` skips SSL/TLS certificate verification when connecting
+  to Elasticsearch. The ability to provide a custom certificate will be added in a later version.
+
+The MCP server is started in stdio mode with this command:
+
+```bash
+docker run -i --rm -e ES_URL -e ES_API_KEY docker.elastic.co/mcp/elasticsearch stdio
+```
+
+The configuration for Claude Desktop is as follows:
+
+```json
+{
+ "mcpServers": {
+   "elasticsearch-mcp-server": {
+    "command": "docker",
+    "args": [
+    	"run", "-i", "--rm",
+    	"-e", "ES_URL", "-e", "ES_API_KEY",
+    	"docker.elastic.co/mcp/elasticsearch",
+    	"stdio"
+    ],
+    "env": {
+      "ES_URL": "<elasticsearch-cluster-url>",
+      "ES_API_KEY": "<elasticsearch-API-key>"
+    }
+   }
+ }
+}
+```
+
+### Using the streamable-HTTP and SSE protocols
+
+Note: streamable-HTTP is recommended, as [SSE is deprecated](https://modelcontextprotocol.io/docs/concepts/transports#server-sent-events-sse-deprecated).
+
+The MCP server needs environment variables to be set:
+* `ES_URL`, the URL of your Elasticsearch cluster
+* Optionally, `ES_SSL_SKIP_VERIFY` set to `true` skips SSL/TLS certificate verification when connecting
+  to Elasticsearch. The ability to provide a custom certificate will be added in a later version.
+
+The MCP client must also be configured with an `Authorization` header containing the Elasticsearch
+cluster's API key
+
+The MCP server is started in http mode with this command:
+
+```bash
+docker run --rm -e ES_URL -p 8080:8080 docker.elastic.co/mcp/elasticsearch http
+```
+
+The streamable-HTTP endpoint is at `http:<host>:8080/mcp`
+
+Configuration for Claude Desktop (free edition that only supports the stdio protocol).
+
+1. Install `mcp-proxy` (or an equivalent), that will bridge stdio to streamable-http. The executable 
+   will be installed in `~/.local/bin`:
+
+    ```bash
+    uv tool install mcp-proxy
+    ```
+
+2. Add this configuration to Claude Desktop:
+
+    ```json
+    {
+      "mcpServers": {
+        "elasticsearch-mcp-server": {
+          "command": "/<home-directory>/.local/bin/mcp-proxy",
+          "args": [
+            "--transport=streamablehttp",
+            "--header", "Authorization", "ApiKey <elasticsearch-API-key>",
+            "http://<mcp-server-host>:<mcp-server-port>/mcp"
+          ]
+        }
+      }
+    }
+    ```
+
