@@ -101,7 +101,7 @@ The MCP server is started in http mode with this command:
 docker run --rm -e ES_URL -p 8080:8080 docker.elastic.co/mcp/elasticsearch http
 ```
 
-The streamable-HTTP endpoint is at `http:<host>:8080/mcp`
+The streamable-HTTP endpoint is at `http:<host>:8080/mcp`. There's also a health check at `http:<host>:8080/ping`
 
 Configuration for Claude Desktop (free edition that only supports the stdio protocol).
 
