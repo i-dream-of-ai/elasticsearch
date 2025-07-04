@@ -25,7 +25,7 @@ use elasticsearch::auth::Credentials;
 use elasticsearch::cert::CertificateValidation;
 use elasticsearch::http::Url;
 use elasticsearch::http::response::Response;
-use http::header;
+use http::{header, HeaderName, HeaderValue};
 use http::request::Parts;
 use indexmap::IndexMap;
 use rmcp::RoleServer;
@@ -37,6 +37,7 @@ use serde_aux::field_attributes::deserialize_bool_from_anything;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use http::header::USER_AGENT;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ElasticsearchMcpConfig {
@@ -191,6 +192,7 @@ impl ElasticsearchMcp {
     }
 
     pub fn new_with_config(config: ElasticsearchMcpConfig) -> anyhow::Result<base_tools::EsBaseTools> {
+        eprintln!("ES config: {:#?}", config);
         let creds = if let Some(api_key) = config.api_key.clone() {
             Some(Credentials::EncodedApiKey(api_key))
         } else if let Some(login) = config.login.clone() {
@@ -210,6 +212,7 @@ impl ElasticsearchMcp {
         if config.ssl_skip_verify {
             transport = transport.cert_validation(CertificateValidation::None)
         }
+        transport = transport.header(USER_AGENT, HeaderValue::from_str(&format!("elastic-mcp/{}", env!("CARGO_PKG_VERSION")))?);
         let transport = transport.build()?;
         let es_client = Elasticsearch::new(transport);
 
