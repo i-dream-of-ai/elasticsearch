@@ -202,7 +202,12 @@ impl ElasticsearchMcp {
             None
         };
 
-        let url = Url::parse(&config.url)?;
+        let url = config.url.as_str();
+        if url.is_empty() {
+            return Err(anyhow::Error::msg("Elasticsearch URL is empty"));
+        }
+
+        let url = Url::parse(url)?;
 
         let pool = elasticsearch::http::transport::SingleNodeConnectionPool::new(url.clone());
         let mut transport = elasticsearch::http::transport::TransportBuilder::new(pool);
