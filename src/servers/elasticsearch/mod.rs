@@ -25,7 +25,7 @@ use elasticsearch::auth::Credentials;
 use elasticsearch::cert::CertificateValidation;
 use elasticsearch::http::Url;
 use elasticsearch::http::response::Response;
-use http::{header, HeaderName, HeaderValue};
+use http::{header, HeaderValue};
 use http::request::Parts;
 use indexmap::IndexMap;
 use rmcp::RoleServer;

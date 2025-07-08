@@ -23,7 +23,20 @@ use elasticsearch_core_mcp_server::{run_http, run_stdio};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+
+    let env_args = std::env::vars().find(|(k, _v)| k == "CLI_ARGS").map(|(_k, v)| v);
+
+    let cli = if let Some(env_args) = env_args {
+        // Concatenate arg[0] with the ARGS value split on whitespaces
+        // Note: we don't handle shell-style string quoting and character escaping
+        let arg0 = std::env::args().next().unwrap();
+        let mut args = vec![arg0.as_str()];
+        args.extend(env_args.split_whitespace());
+
+        Cli::parse_from(args)
+    } else {
+        Cli::parse()
+    };
 
     // Initialize the tracing subscriber with file and stdout logging
     tracing_subscriber::fmt()
