@@ -192,7 +192,6 @@ impl ElasticsearchMcp {
     }
 
     pub fn new_with_config(config: ElasticsearchMcpConfig) -> anyhow::Result<base_tools::EsBaseTools> {
-        eprintln!("ES config: {:#?}", config);
         let creds = if let Some(api_key) = config.api_key.clone() {
             Some(Credentials::EncodedApiKey(api_key))
         } else if let Some(login) = config.login.clone() {

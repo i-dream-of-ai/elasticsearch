@@ -108,6 +108,7 @@ impl HttpProtocol {
 
         // Put all things together
         let main_router = Router::new()
+            .route("/", get(hello))
             .route("/ping", get(async || (StatusCode::OK, "Ready\n")))
             .nest("/mcp/sse", sse_router)
             .nest("/mcp", sh_router)
@@ -134,6 +135,16 @@ impl HttpProtocol {
 
         Ok(ct)
     }
+}
+
+async fn hello() -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    format!(r#"Elasticsearch MCP server. Version {version}
+
+Endpoints:
+- streamable-http: /mcp
+- sse: /mcp/sse
+"#)
 }
 
 #[cfg(test)]

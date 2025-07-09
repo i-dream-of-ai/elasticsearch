@@ -102,7 +102,7 @@ docker run --rm -e ES_URL -p 8080:8080 docker.elastic.co/mcp/elasticsearch http
 ```
 
 If for some reason your execution environment doesn't allow passing parameters to the container, they can be passed
-using the `CLI_ARGS` environment variable: `docker run --rm -e ES_URL -e CLI_ARGS http -p 8080:8080...`
+using the `CLI_ARGS` environment variable: `docker run --rm -e ES_URL -e CLI_ARGS=http -p 8080:8080...`
 
 The streamable-HTTP endpoint is at `http:<host>:8080/mcp`. There's also a health check at `http:<host>:8080/ping`
 
