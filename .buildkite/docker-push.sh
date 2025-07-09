@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-version_tag=$(awk -F ' = ' '$1 ~ /version/ { gsub(/[\"]/, "", $2); printf("%s",$2) }' Cargo.toml)
+version_tag=$(grep '^version = ' Cargo.toml | sed -e 's/[^"]*"//' -e 's/".*//')
 elastic_image="docker.elastic.co/mcp/elasticsearch"
 
 # build image
