@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /*
  * Copyright Elasticsearch B.V. and contributors
  * SPDX-License-Identifier: Apache-2.0
@@ -313,10 +314,22 @@ export async function createElasticsearchMcpServer (config: ElasticsearchConfig)
           }
         )
         .describe(
-          'Complete Elasticsearch query DSL object that can include query, size, from, sort, etc.'
-        )
+          "Complete Elasticsearch query DSL object that can include query, size, from, sort, etc."
+        ),
+
+      profile: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Whether to include query profiling information"),
+
+      explain: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Whether to include explanation of how the query was executed"),
     },
-    async ({ index, queryBody }) => {
+    async ({ index, queryBody, profile, explain }) => {
       try {
         // Get mappings to identify text fields for highlighting
         const mappingResponse = await esClient.indices.getMapping({
@@ -327,8 +340,10 @@ export async function createElasticsearchMcpServer (config: ElasticsearchConfig)
 
         const searchRequest: estypes.SearchRequest = {
           index,
-          ...queryBody
-        }
+          ...queryBody,
+          profile,
+          explain,
+        };
 
         // Always do highlighting
         if (indexMappings.properties != null) {
@@ -374,6 +389,10 @@ export async function createElasticsearchMcpServer (config: ElasticsearchConfig)
             }
           }
 
+          if (explain && hit._explanation) {
+            content += `\nExplanation:\n${JSON.stringify(hit._explanation, null, 2)}`
+          }
+
           return {
             type: 'text' as const,
             text: content.trim()
@@ -395,6 +414,16 @@ export async function createElasticsearchMcpServer (config: ElasticsearchConfig)
               text: `Aggregations: ${JSON.stringify(result.aggregations, null, 2)}`
             }
           : null
+
+        const fragments = [metadataFragment, ...contentFragments]
+
+        if (profile && result.profile) {
+          const profileFragment = {
+            type: "text" as const,
+            text: `\nQuery Profile:\n${JSON.stringify(result.profile, null, 2)}`,
+          }
+          fragments.push(profileFragment)
+        }
 
         return {
           content: (aggregationsFragment != null)
@@ -490,13 +519,13 @@ export async function createElasticsearchMcpServer (config: ElasticsearchConfig)
 
 const config: ElasticsearchConfig = {
   url: process.env.ES_URL ?? '',
-  apiKey: process.env.ES_API_KEY ?? '',
-  username: process.env.ES_USERNAME ?? '',
-  password: process.env.ES_PASSWORD ?? '',
-  caCert: process.env.ES_CA_CERT ?? '',
-  version: process.env.ES_VERSION ?? '',
+  apiKey: process.env.ES_API_KEY,
+  username: process.env.ES_USERNAME,
+  password: process.env.ES_PASSWORD,
+  caCert: process.env.ES_CA_CERT,
+  version: process.env.ES_VERSION,
   sslSkipVerify: process.env.ES_SSL_SKIP_VERIFY === '1' || process.env.ES_SSL_SKIP_VERIFY === 'true',
-  pathPrefix: process.env.ES_PATH_PREFIX ?? ''
+  pathPrefix: process.env.ES_PATH_PREFIX
 }
 
 async function main (): Promise<void> {
@@ -504,9 +533,9 @@ async function main (): Promise<void> {
   // by requiring the stdio protocol (http will come later)
   if (process.env.RUNNING_IN_CONTAINER === "true") {
     if (process.argv.length != 3 || process.argv[2] !== "stdio" ) {
-      console.log("Missing protocol argument.");
-      console.log("Usage: npm start stdio");
-      process.exit(1);
+      console.log("Missing protocol argument.")
+      console.log("Usage: npm start stdio")
+      process.exit(1)
     }
   }
 
