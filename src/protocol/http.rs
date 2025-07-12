@@ -139,18 +139,18 @@ impl HttpProtocol {
 
 async fn hello() -> String {
     let version = env!("CARGO_PKG_VERSION");
-    format!(r#"Elasticsearch MCP server. Version {version}
+    format!(
+        r#"Elasticsearch MCP server. Version {version}
 
 Endpoints:
 - streamable-http: /mcp
 - sse: /mcp/sse
-"#)
+"#
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     pub fn test_parts_in_extensions() {}
 }

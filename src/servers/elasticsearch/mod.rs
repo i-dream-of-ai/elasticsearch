@@ -25,8 +25,9 @@ use elasticsearch::auth::Credentials;
 use elasticsearch::cert::CertificateValidation;
 use elasticsearch::http::Url;
 use elasticsearch::http::response::Response;
-use http::{header, HeaderValue};
+use http::header::USER_AGENT;
 use http::request::Parts;
+use http::{HeaderValue, header};
 use indexmap::IndexMap;
 use rmcp::RoleServer;
 use rmcp::model::ToolAnnotations;
@@ -37,7 +38,6 @@ use serde_aux::field_attributes::deserialize_bool_from_anything;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
-use http::header::USER_AGENT;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ElasticsearchMcpConfig {
@@ -216,7 +216,10 @@ impl ElasticsearchMcp {
         if config.ssl_skip_verify {
             transport = transport.cert_validation(CertificateValidation::None)
         }
-        transport = transport.header(USER_AGENT, HeaderValue::from_str(&format!("elastic-mcp/{}", env!("CARGO_PKG_VERSION")))?);
+        transport = transport.header(
+            USER_AGENT,
+            HeaderValue::from_str(&format!("elastic-mcp/{}", env!("CARGO_PKG_VERSION")))?,
+        );
         let transport = transport.build()?;
         let es_client = Elasticsearch::new(transport);
 

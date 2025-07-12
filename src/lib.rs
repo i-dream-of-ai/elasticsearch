@@ -87,9 +87,7 @@ pub async fn run_http(cmd: HttpCommand) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn setup_services(
-    config: &Option<PathBuf>,
-) -> anyhow::Result<impl Service<RoleServer> + Clone> {
+pub async fn setup_services(config: &Option<PathBuf>) -> anyhow::Result<impl Service<RoleServer> + Clone> {
     // Read config file and expand variables, also accepting .env files
     match dotenvy::dotenv() {
         Err(dotenvy::Error::Io(io_err)) if io_err.kind() == ErrorKind::NotFound => {}

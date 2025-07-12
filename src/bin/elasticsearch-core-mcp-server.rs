@@ -16,13 +16,12 @@
 // under the License.
 
 use clap::Parser;
-use tracing_subscriber::EnvFilter;
 use elasticsearch_core_mcp_server::cli::Cli;
+use tracing_subscriber::EnvFilter;
 // To test with stdio, use npx @modelcontextprotocol/inspector cargo run -p elastic-mcp
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-
     let env_args = std::env::vars().find(|(k, _v)| k == "CLI_ARGS").map(|(_k, v)| v);
 
     let cli = if let Some(env_args) = env_args {

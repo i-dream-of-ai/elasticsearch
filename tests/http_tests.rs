@@ -1,22 +1,21 @@
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 use anyhow::bail;
-use axum::extract::Path;
 use axum::Router;
+use axum::extract::Path;
+use elasticsearch_core_mcp_server::cli;
 use futures_util::StreamExt;
-use http::header::{ACCEPT, CONTENT_TYPE};
 use http::HeaderMap;
+use http::header::{ACCEPT, CONTENT_TYPE};
 use reqwest::Client;
 use rmcp::model::ToolAnnotations;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::json;
 use sse_stream::SseStream;
-use elasticsearch_core_mcp_server::cli;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 
 /// Simple smoke test
 #[tokio::test]
 async fn http_tool_list() -> anyhow::Result<()> {
-
     let addr = find_address()?;
 
     let cli = cli::Cli {
@@ -24,10 +23,10 @@ async fn http_tool_list() -> anyhow::Result<()> {
             config: None,
             address: Some(addr),
             sse: false,
-        })
+        }),
     };
 
-    tokio::spawn(async move {cli.run().await});
+    tokio::spawn(async move { cli.run().await });
 
     let url = format!("http://127.0.0.1:{}/mcp", addr.port());
 
@@ -40,15 +39,23 @@ async fn http_tool_list() -> anyhow::Result<()> {
     let client = Client::builder().build()?;
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-    let response = client.post(url)
+    let response = client
+        .post(url)
         .header(CONTENT_TYPE, "application/json")
         .header(ACCEPT, "application/json, text/event-stream")
-        .json(&body).send().await?
+        .json(&body)
+        .send()
+        .await?
         .error_for_status()?;
 
     let response_body: ListToolsResponse = parse_response(response).await?;
 
-    let names = response_body.result.tools.iter().map(|t| t.name.as_str()).collect::<Vec<_>>();
+    let names = response_body
+        .result
+        .tools
+        .iter()
+        .map(|t| t.name.as_str())
+        .collect::<Vec<_>>();
     assert!(names.contains(&"search"));
     assert!(names.contains(&"list_indices"));
     assert!(names.contains(&"get_mappings"));
@@ -58,10 +65,10 @@ async fn http_tool_list() -> anyhow::Result<()> {
 // End-to-end test that spawns a mock ES server and calls the `list_indices` tool via http
 #[tokio::test]
 async fn end_to_end() -> anyhow::Result<()> {
-
     // Start an ES mock that will reply to list_indices
-    let router = Router::new()
-        .route("/_cat/indices/{index}", axum::routing::get(async move |headers: HeaderMap, Path(index): Path<String>| {
+    let router = Router::new().route(
+        "/_cat/indices/{index}",
+        axum::routing::get(async move |headers: HeaderMap, Path(index): Path<String>| {
             // Check parameter forwarding
             assert_eq!(index, "test-index");
             // Check API key
@@ -73,7 +80,8 @@ async fn end_to_end() -> anyhow::Result<()> {
                 "docs.count": "100"
               }
             ]))
-        }));
+        }),
+    );
 
     let listener = tokio::net::TcpListener::bind(LOCALHOST_0).await?;
 
@@ -93,10 +101,10 @@ async fn end_to_end() -> anyhow::Result<()> {
             config: None,
             address: Some(addr),
             sse: false,
-        })
+        }),
     };
 
-    tokio::spawn(async move {cli.run().await});
+    tokio::spawn(async move { cli.run().await });
     let url = format!("http://127.0.0.1:{}/mcp", addr.port());
     let body = json!({
         "jsonrpc": "2.0",
@@ -113,20 +121,25 @@ async fn end_to_end() -> anyhow::Result<()> {
     let client = Client::builder().build()?;
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-    let response = client.post(url)
+    let response = client
+        .post(url)
         .header(CONTENT_TYPE, "application/json")
         .header(ACCEPT, "application/json, text/event-stream")
-        .json(&body).send().await?
+        .json(&body)
+        .send()
+        .await?
         .error_for_status()?;
 
     let response_body: serde_json::Value = parse_response(response).await?;
 
     assert_eq!(response_body["result"]["content"][0]["text"], "Found 1 indices:");
-    assert_eq!(response_body["result"]["content"][1]["text"], "[{\"index\":\"test-index\",\"status\":\"open\",\"docs.count\":100}]");
+    assert_eq!(
+        response_body["result"]["content"][1]["text"],
+        "[{\"index\":\"test-index\",\"status\":\"open\",\"docs.count\":100}]"
+    );
 
     Ok(())
 }
-
 
 const LOCALHOST_0: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
 
@@ -137,9 +150,7 @@ fn find_address() -> anyhow::Result<SocketAddr> {
 
 async fn parse_response<T: DeserializeOwned>(response: reqwest::Response) -> anyhow::Result<T> {
     let result = match response.headers().get(CONTENT_TYPE) {
-        Some(v) if v == "application/json" => {
-            response.json().await?
-        }
+        Some(v) if v == "application/json" => response.json().await?,
         Some(v) if v == "text/event-stream" => {
             let mut stream = SseStream::from_byte_stream(response.bytes_stream());
             match stream.next().await {
@@ -148,7 +159,7 @@ async fn parse_response<T: DeserializeOwned>(response: reqwest::Response) -> any
                 Some(Ok(sse)) => {
                     let data = sse.data.unwrap();
                     serde_json::from_str(&data)?
-                },
+                }
             }
         }
         _ => {
@@ -179,5 +190,5 @@ struct Tool {
     name: String,
     description: String,
     input_schema: Option<serde_json::Value>,
-    annotations: Option<ToolAnnotations>
+    annotations: Option<ToolAnnotations>,
 }
