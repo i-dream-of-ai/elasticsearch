@@ -100,17 +100,17 @@ mod tests {
     #[test]
     fn good_extrapolation() -> anyhow::Result<()> {
         assert_eq!("012345678", expand("012345678")?);
-        assert_eq!("foo_value01234", expand("{{foo}}01234")?);
-        assert_eq!("foo_value01234\n1234bar_value", expand("{{foo}}01234\n1234{{bar}}")?);
-        assert_eq!("foo_value01234bar_value", expand("{{foo}}01234{{bar}}")?);
-        assert_eq!("_01_foo_value01234bar_value567", expand("_01_{{foo}}01234{{bar}}567")?);
+        assert_eq!("foo_value01234", expand("${foo}01234")?);
+        assert_eq!("foo_value01234\n1234bar_value", expand("${foo}01234\n1234${bar}")?);
+        assert_eq!("foo_value01234bar_value", expand("${foo}01234${bar}")?);
+        assert_eq!("_01_foo_value01234bar_value567", expand("_01_${foo}01234${bar}567")?);
         Ok(())
     }
 
     #[test]
     fn failed_extrapolation() {
-        assert!(expand("{{foo01234").is_err());
-        assert!(expand("{{foo}}01234{{bar").is_err());
-        assert!(expand("{{baz}}01234").is_err());
+        assert!(expand("${foo01234").is_err());
+        assert!(expand("${foo}01234${bar").is_err());
+        assert!(expand("${baz}01234").is_err());
     }
 }

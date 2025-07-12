@@ -20,7 +20,7 @@ mod protocol;
 mod servers;
 mod utils;
 
-use crate::cli::{Configuration, HttpCommand, StdioCommand};
+use crate::cli::{Cli, Command, Configuration, HttpCommand, StdioCommand};
 use crate::protocol::http::{HttpProtocol, HttpServerConfig};
 use crate::servers::elasticsearch;
 use crate::utils::interpolator;
@@ -35,8 +35,17 @@ use std::sync::Arc;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 
+impl Cli {
+    pub async fn run(self) -> anyhow::Result<()> {
+        match self.command {
+            Command::Stdio(cmd) => run_stdio(cmd).await,
+            Command::Http(cmd) => run_http(cmd).await,
+        }
+    }
+}
+
 pub async fn run_stdio(cmd: StdioCommand) -> anyhow::Result<()> {
-    let (ct, handler) = setup_services(&cmd.config).await?;
+    let handler = setup_services(&cmd.config).await?;
     let service = handler.serve(stdio()).await.inspect_err(|e| {
         tracing::error!("serving error: {:?}", e);
     })?;
@@ -45,13 +54,12 @@ pub async fn run_stdio(cmd: StdioCommand) -> anyhow::Result<()> {
         _ = service.waiting() => {},
         _ = tokio::signal::ctrl_c() => {},
     }
-    ct.cancel();
 
     Ok(())
 }
 
 pub async fn run_http(cmd: HttpCommand) -> anyhow::Result<()> {
-    let (_ct, handler) = setup_services(&cmd.config).await?;
+    let handler = setup_services(&cmd.config).await?;
     let server_provider = move || handler.clone();
     let address: SocketAddr = if let Some(addr) = cmd.address {
         addr
@@ -79,9 +87,9 @@ pub async fn run_http(cmd: HttpCommand) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn setup_services(
+pub async fn setup_services(
     config: &Option<PathBuf>,
-) -> anyhow::Result<(CancellationToken, impl Service<RoleServer> + Clone)> {
+) -> anyhow::Result<impl Service<RoleServer> + Clone> {
     // Read config file and expand variables, also accepting .env files
     match dotenvy::dotenv() {
         Err(dotenvy::Error::Io(io_err)) if io_err.kind() == ErrorKind::NotFound => {}
@@ -123,9 +131,6 @@ async fn setup_services(
         Err(err) => return Err(err)?,
     };
 
-    let ct = CancellationToken::new();
-
     let handler = elasticsearch::ElasticsearchMcp::new_with_config(config.elasticsearch)?;
-
-    Ok((ct, handler))
+    Ok(handler)
 }
