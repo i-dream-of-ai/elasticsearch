@@ -72,7 +72,10 @@ async fn end_to_end() -> anyhow::Result<()> {
             // Check parameter forwarding
             assert_eq!(index, "test-index");
             // Check API key
-            assert_eq!(headers.get("Authorization").unwrap().to_str().unwrap(), "ApiKey foobar");
+            assert_eq!(
+                headers.get("Authorization").unwrap().to_str().unwrap(),
+                "ApiKey value-from-the-test"
+            );
             axum::Json(json!([
               {
                 "index": "test-index",
@@ -89,7 +92,6 @@ async fn end_to_end() -> anyhow::Result<()> {
     // TODO: refactor the CLI to accept an alternate source of key/values
     unsafe {
         std::env::set_var("ES_URL", format!("http://127.0.0.1:{}/", listener.local_addr()?.port()));
-        std::env::set_var("ES_API_KEY", "foobar");
     }
     let server = axum::serve(listener, router);
     tokio::spawn(async { server.await });
@@ -125,6 +127,7 @@ async fn end_to_end() -> anyhow::Result<()> {
         .post(url)
         .header(CONTENT_TYPE, "application/json")
         .header(ACCEPT, "application/json, text/event-stream")
+        .header("Authorization", "ApiKey value-from-the-test")
         .json(&body)
         .send()
         .await?
