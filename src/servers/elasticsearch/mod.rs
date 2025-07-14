@@ -16,7 +16,6 @@
 // under the License.
 
 mod base_tools;
-mod query_templates;
 
 use crate::servers::IncludeExclude;
 use crate::utils::none_if_empty_string;
@@ -37,7 +36,6 @@ use serde::{Deserialize, Serialize};
 use serde_aux::field_attributes::deserialize_bool_from_anything;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ElasticsearchMcpConfig {
@@ -174,23 +172,9 @@ pub enum SearchTemplate {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)]
-pub struct ElasticsearchMcp {
-    es_client: Elasticsearch,
-    config: Arc<ElasticsearchMcpConfig>,
-}
+pub struct ElasticsearchMcp {}
 
 impl ElasticsearchMcp {
-    #[allow(dead_code)]
-    pub fn setup(
-        config: ElasticsearchMcpConfig,
-        handlers: &mut crate::servers::aggregate::AggregateServerBuilder,
-    ) -> anyhow::Result<()> {
-        let mcp = Self::new_with_config(config)?;
-        handlers.push(mcp);
-        Ok(())
-    }
-
     pub fn new_with_config(config: ElasticsearchMcpConfig) -> anyhow::Result<base_tools::EsBaseTools> {
         let creds = if let Some(api_key) = config.api_key.clone() {
             Some(Credentials::EncodedApiKey(api_key))

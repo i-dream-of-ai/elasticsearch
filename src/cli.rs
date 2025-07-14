@@ -79,11 +79,6 @@ pub struct Stdio {
     /// Environment variables
     #[serde(default)]
     pub env: HashMap<String, String>,
-    // /// Env file
-    // pub env_file: Option<String>,
-
-    // /// Timeout in milliseconds (default 60 secs)
-    // pub timeout: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -95,8 +90,6 @@ pub struct Http {
     /// HTTP headers to send with the request
     #[serde(default)]
     pub headers: HashMap<String, String>,
-    // /// Timeout in milliseconds (default 60 secs)
-    // pub timeout: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

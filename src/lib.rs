@@ -114,9 +114,6 @@ pub async fn setup_services(config: &Option<PathBuf>) -> anyhow::Result<impl Ser
     // Expand environment variables in the config file
     let config = interpolator::interpolate_from_env(config)?;
 
-    //let jd = &mut serde_json::Deserializer::from_str(&config);
-    //let config: McpServers = serde_path_to_error::deserialize(jd)?;
-
     // JSON5 adds comments and multiline strings (useful for ES|QL) to JSON
     let config: Configuration = match serde_json5::from_str(&config) {
         Ok(c) => c,

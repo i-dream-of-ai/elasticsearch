@@ -17,9 +17,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub mod aggregate;
 pub mod elasticsearch;
-pub mod proxy;
 
 /// Inclusion or exclusion list.
 #[derive(Debug, Serialize, Deserialize)]
