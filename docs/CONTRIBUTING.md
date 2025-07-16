@@ -4,7 +4,7 @@
 [pr]: https://github.com/elastic/mcp-server-elasticsearch/compare
 [code-of-conduct]: https://www.elastic.co/community/codeofconduct
 
-Elasticsearch MCP Server client is open source and we love to receive contributions from our community — you!
+Elasticsearch MCP Server is open source, and we love to receive contributions from our community — you!
 
 There are many ways to contribute, from writing tutorials or blog posts, improving the documentation, submitting bug reports and feature requests or writing code.
 
@@ -15,26 +15,18 @@ Please note that this project follows the [Elastic's Open Source Community Code 
 
 ## Setup
 
-1. Install Node.js 18+ (using [nvm](https://github.com/nvm-sh/nvm) is recommended)
-   ```bash
-   nvm use
-   ```
-2. Install dependencies
-   ```bash
-   npm install
-   ```
-3. Build the project
-   ```bash
-   npm run build
+1. Install Rust (using [rustup](https://www.rust-lang.org/tools/install) is recommended)
+
+2. Build the project:
+   ```sh
+   cargo build
    ```
 
-To build the Docker image, run:
+   or to build the Docker image, run:
 
-```sh
-npm run build-docker-image
-```
-
-This builds a multi-architecture image for amd64 and arm64. If you don't have a configuration that allows multi-architecture builds, simply run `docker build -t mcp/elasticsearch` .
+   ```sh
+   docker build -t mcp/elasticsearch
+   ```
 
 ## Start Elasticsearch
 
@@ -57,13 +49,14 @@ You can use either:
 
 1. [Fork][fork] and clone the repository
 2. Create a new branch: `git checkout -b my-branch-name`
-3. Make your changes
-4. Test locally with the MCP Inspector:
+3. Make your changes and add tests
+4. Fix `cargo clippy` warnings, run `cargo fmt` and `cargo test`
+5. Test locally with the MCP Inspector:
    ```bash
-   ES_URL=your-elasticsearch-url ES_API_KEY=your-api-key npm run inspector
+   npx @modelcontextprotocol/inspector
    ```
-5. [Test with MCP Client](../README.md#developing-locally)
-6. Push to your fork and [submit a pull request][pr]
+7. [Test with MCP Client](../README.md#installation--setup)
+8. Push to your fork and [submit a pull request][pr]
 
 ## Best Practices
 
@@ -72,8 +65,6 @@ You can use either:
 - Include tests for your changes
 - Keep PRs focused on a single concern
 - Update documentation as needed
-- Use TypeScript with proper typing
-- Add JSDoc comments to new functions
 
 ## Getting Help
 
